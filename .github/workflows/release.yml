@@ -20,6 +20,12 @@ jobs:
         with:
           go-version: '1.25'
 
+      - name: Run unit tests
+        run: make test
+
+      - name: Run integration tests
+        run: make test-integration
+
       - name: Build all platforms
         run: make build-all
 

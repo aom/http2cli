@@ -1,4 +1,4 @@
-.PHONY: build build-linux-amd64 build-linux-arm64 build-darwin-arm64 build-windows-amd64 build-all run test clean docker docker-dev
+.PHONY: build build-linux-amd64 build-linux-arm64 build-darwin-arm64 build-windows-amd64 build-all run test test-integration test-all clean docker docker-dev
 
 # Build binary for current platform
 build:
@@ -27,9 +27,16 @@ build-all: build-linux-amd64 build-linux-arm64 build-darwin-arm64 build-windows-
 run: build
 	./http2cli --config configs/config.yaml
 
-# Run tests
+# Run unit tests
 test:
 	go test ./...
+
+# Run integration tests in Docker
+test-integration: docker-dev
+	docker run --rm http2cli:dev /tests/integration.sh
+
+# Run all tests
+test-all: test test-integration
 
 # Clean build artifacts
 clean:

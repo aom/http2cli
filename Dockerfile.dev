@@ -10,11 +10,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o http2cli ./cmd/http2cl
 # Runtime with Alpine (has cat, date, rev)
 FROM alpine:3.19
 
-# Install wget for healthcheck
-RUN apk add --no-cache wget
+# Install wget for healthcheck, curl for tests
+RUN apk add --no-cache wget curl
 
 COPY --from=builder /build/http2cli /usr/local/bin/http2cli
 COPY configs/config.yaml /etc/http2cli/config.yaml
+COPY tests/integration.sh /tests/integration.sh
+RUN chmod +x /tests/integration.sh
 
 EXPOSE 8080
 
