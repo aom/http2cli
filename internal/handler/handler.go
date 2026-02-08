@@ -174,6 +174,15 @@ func (h *ToolHandler) buildArguments(r *http.Request, inputFile string) ([]strin
 	return args, nil
 }
 
+// cleanupMultipartForm safely cleans up temporary files created by ParseMultipartForm
+func cleanupMultipartForm(r *http.Request) {
+	if r.MultipartForm != nil {
+		if err := r.MultipartForm.RemoveAll(); err != nil {
+			log.Printf("failed to clean up multipart form files: %v", err)
+		}
+	}
+}
+
 func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	if h.tool.Input.FormField == "" {
 		return nil, fmt.Errorf("input form_field not configured")
@@ -183,6 +192,8 @@ func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
 		return nil, fmt.Errorf("failed to parse multipart form: %w", err)
 	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer cleanupMultipartForm(r)
 
 	file, _, err := r.FormFile(h.tool.Input.FormField)
 	if err != nil {
@@ -211,6 +222,8 @@ func (h *ToolHandler) saveInputToTempFile(r *http.Request) (string, error) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
 		return "", fmt.Errorf("failed to parse multipart form: %w", err)
 	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer cleanupMultipartForm(r)
 
 	file, header, err := r.FormFile(h.tool.Input.FormField)
 	if err != nil {
