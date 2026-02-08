@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -42,21 +44,34 @@ func (h *ToolHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.tool.Timeout)
 	defer cancel()
 
-	// Parse and validate arguments
-	args, err := h.buildArguments(r)
-	if err != nil {
-		sendError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	// Handle input
+	// Handle input based on type
 	var stdin io.Reader
-	if h.tool.Input.Type == "stdin" {
+	var inputFile string
+	var err error
+
+	switch h.tool.Input.Type {
+	case "stdin":
 		stdin, err = h.getInputReader(r)
 		if err != nil {
 			sendError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+	case "file":
+		inputFile, err = h.saveInputToTempFile(r)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if inputFile != "" {
+			defer os.Remove(inputFile)
+		}
+	}
+
+	// Parse and validate arguments (after we have inputFile)
+	args, err := h.buildArguments(r, inputFile)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// Execute command
@@ -86,11 +101,20 @@ func (h *ToolHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
-func (h *ToolHandler) buildArguments(r *http.Request) ([]string, error) {
+func (h *ToolHandler) buildArguments(r *http.Request, inputFile string) ([]string, error) {
 	var args []string
 
-	// Add static arguments
-	args = append(args, h.tool.Arguments.Static...)
+	// Add static arguments, replacing {{input_file}} placeholder
+	for _, arg := range h.tool.Arguments.Static {
+		if arg == "{{input_file}}" {
+			if inputFile == "" {
+				return nil, fmt.Errorf("input file required but not provided")
+			}
+			args = append(args, inputFile)
+		} else {
+			args = append(args, arg)
+		}
+	}
 
 	// Process mapped arguments
 	for _, mapping := range h.tool.Arguments.Mapped {
@@ -150,6 +174,15 @@ func (h *ToolHandler) buildArguments(r *http.Request) ([]string, error) {
 	return args, nil
 }
 
+// cleanupMultipartForm safely cleans up temporary files created by ParseMultipartForm
+func cleanupMultipartForm(r *http.Request) {
+	if r.MultipartForm != nil {
+		if err := r.MultipartForm.RemoveAll(); err != nil {
+			log.Printf("failed to clean up multipart form files: %v", err)
+		}
+	}
+}
+
 func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	if h.tool.Input.FormField == "" {
 		return nil, fmt.Errorf("input form_field not configured")
@@ -159,6 +192,8 @@ func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
 		return nil, fmt.Errorf("failed to parse multipart form: %w", err)
 	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer cleanupMultipartForm(r)
 
 	file, _, err := r.FormFile(h.tool.Input.FormField)
 	if err != nil {
@@ -176,6 +211,50 @@ func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	}
 
 	return &buf, nil
+}
+
+func (h *ToolHandler) saveInputToTempFile(r *http.Request) (string, error) {
+	if h.tool.Input.FormField == "" {
+		return "", fmt.Errorf("input form_field not configured")
+	}
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
+		return "", fmt.Errorf("failed to parse multipart form: %w", err)
+	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer cleanupMultipartForm(r)
+
+	file, header, err := r.FormFile(h.tool.Input.FormField)
+	if err != nil {
+		if h.tool.Input.Required {
+			return "", fmt.Errorf("required file %q not provided", h.tool.Input.FormField)
+		}
+		return "", nil
+	}
+	defer file.Close()
+
+	// Get file extension from original filename
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".tmp"
+	}
+
+	// Create temp file with same extension
+	tmpFile, err := os.CreateTemp("", "http2cli-*"+ext)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	// Copy uploaded file to temp file
+	if _, err := io.Copy(tmpFile, file); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	tmpFile.Close()
+	return tmpFile.Name(), nil
 }
 
 // ErrorResponse represents a JSON error response.

@@ -47,7 +47,8 @@ test_case "GET /ready" \
 test_case "GET /api/tools" \
     'curl -sf http://localhost:8080/api/tools | grep -q "\"name\":\"cat\"" && \
      curl -sf http://localhost:8080/api/tools | grep -q "\"name\":\"date\"" && \
-     curl -sf http://localhost:8080/api/tools | grep -q "\"name\":\"rev\""'
+     curl -sf http://localhost:8080/api/tools | grep -q "\"name\":\"rev\"" && \
+     curl -sf http://localhost:8080/api/tools | grep -q "\"name\":\"cat-file\""'
 
 echo ""
 echo "--- Date Tool ---"
@@ -75,6 +76,14 @@ test_case "POST /rev reverses text" \
 
 test_case "POST /rev handles multiple lines" \
     'printf "abc\ndef" | curl -sf -F "text=@-" http://localhost:8080/rev | grep -q "cba"'
+
+echo ""
+echo "--- Cat-File Tool (file input type) ---"
+test_case "POST /cat-file echoes input" \
+    'curl -sf -F "file=@/tests/support/text.txt" http://localhost:8080/cat-file | grep -q "Here be text"'
+
+test_case "POST /cat-file handles binary" \
+    'printf "\x00\x01\x02" | curl -sf -F "file=@-" http://localhost:8080/cat-file | wc -c | grep -q "3"'
 
 echo ""
 echo "--- Error Cases ---"

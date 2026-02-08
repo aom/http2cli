@@ -70,3 +70,20 @@ tools:
     output:
       type: stdout
       content_type: text/plain
+
+  # File input - demonstrates {{input_file}} placeholder
+  - name: cat-file
+    description: "Pass file contents through (file input)"
+    endpoint: /cat-file
+    method: POST
+    command: /bin/cat
+    input:
+      type: file
+      form_field: file
+      required: true
+    output:
+      type: stdout
+      content_type: application/octet-stream
+    arguments:
+      static:
+        - "{{input_file}}"
