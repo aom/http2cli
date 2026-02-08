@@ -1,0 +1,72 @@
+# http2cli configuration
+# See docs/configuration.md for full reference
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 300s
+  max_upload_size: 10MB
+
+security:
+  # API key for X-API-Key header authentication (empty = disabled)
+  api_key: ""
+  # Only these commands can be executed
+  allowed_commands:
+    - /bin/cat
+    - /bin/date
+    - /bin/rev
+  # Default timeout for command execution
+  command_timeout: 30s
+  # Maximum concurrent command executions
+  max_concurrent_commands: 10
+
+tools:
+  # Simple pass-through - demonstrates stdin/stdout
+  - name: cat
+    description: "Pass file contents through"
+    endpoint: /cat
+    method: POST
+    command: /bin/cat
+    input:
+      type: stdin
+      form_field: file
+    output:
+      type: stdout
+      content_type: application/octet-stream
+
+  # No input - demonstrates args-only command
+  - name: date
+    description: "Get current date/time"
+    endpoint: /date
+    method: GET
+    command: /bin/date
+    input:
+      type: none
+    output:
+      type: stdout
+      content_type: text/plain
+    arguments:
+      mapped:
+        - name: format
+          flag: "+"
+          source: query
+          type: string
+          default: "%Y-%m-%d %H:%M:%S"
+        - name: utc
+          flag: "-u"
+          source: query
+          type: bool
+
+  # Text processing - demonstrates stdin with transformation
+  - name: rev
+    description: "Reverse each line of text"
+    endpoint: /rev
+    method: POST
+    command: /bin/rev
+    input:
+      type: stdin
+      form_field: text
+    output:
+      type: stdout
+      content_type: text/plain

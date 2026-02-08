@@ -1,0 +1,21 @@
+# Development Dockerfile - includes CLI tools for testing
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o http2cli ./cmd/http2cli
+
+# Runtime with Alpine (has cat, date, rev)
+FROM alpine:3.19
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
+COPY --from=builder /build/http2cli /usr/local/bin/http2cli
+COPY configs/config.yaml /etc/http2cli/config.yaml
+
+EXPOSE 8080
+
+CMD ["http2cli", "--config", "/etc/http2cli/config.yaml"]
