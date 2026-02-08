@@ -183,6 +183,8 @@ func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
 		return nil, fmt.Errorf("failed to parse multipart form: %w", err)
 	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer r.MultipartForm.RemoveAll()
 
 	file, _, err := r.FormFile(h.tool.Input.FormField)
 	if err != nil {
@@ -211,6 +213,8 @@ func (h *ToolHandler) saveInputToTempFile(r *http.Request) (string, error) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB memory limit
 		return "", fmt.Errorf("failed to parse multipart form: %w", err)
 	}
+	// Clean up temporary files created by ParseMultipartForm
+	defer r.MultipartForm.RemoveAll()
 
 	file, header, err := r.FormFile(h.tool.Input.FormField)
 	if err != nil {
