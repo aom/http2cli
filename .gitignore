@@ -1,5 +1,7 @@
 # Binaries
-http2cli
+http2cli-darwin-arm64
+http2cli-linux-amd64
+http2cli-linux-arm64
 *.exe
 *.exe~
 *.dll
@@ -35,4 +37,3 @@ Thumbs.db
 *.tmp
 *.log
 
-http2cli-*
