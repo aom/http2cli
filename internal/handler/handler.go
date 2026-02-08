@@ -186,7 +186,9 @@ func (h *ToolHandler) getInputReader(r *http.Request) (io.Reader, error) {
 	// Clean up temporary files created by ParseMultipartForm
 	defer func() {
 		if r.MultipartForm != nil {
-			r.MultipartForm.RemoveAll()
+			if err := r.MultipartForm.RemoveAll(); err != nil {
+				log.Printf("failed to clean up multipart form files: %v", err)
+			}
 		}
 	}()
 
@@ -220,7 +222,9 @@ func (h *ToolHandler) saveInputToTempFile(r *http.Request) (string, error) {
 	// Clean up temporary files created by ParseMultipartForm
 	defer func() {
 		if r.MultipartForm != nil {
-			r.MultipartForm.RemoveAll()
+			if err := r.MultipartForm.RemoveAll(); err != nil {
+				log.Printf("failed to clean up multipart form files: %v", err)
+			}
 		}
 	}()
 
